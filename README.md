@@ -6,13 +6,13 @@
 ![lifelines](https://img.shields.io/badge/lifelines-0.30-4E79A7)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> **Portfolio project** — Bioinformatics · Multi-omics integration · Survival analysis
+> **Portfolio project** - Bioinformatics · Multi-omics integration · Survival analysis
 
 ---
 
 ## Overview
 
-Glioblastoma Multiforme (GBM) is the most aggressive primary brain tumour in adults, with a median overall survival of ~15 months. It exhibits profound molecular heterogeneity across three well-characterised subtypes — **Proneural**, **Classical**, and **Mesenchymal** — each with distinct transcriptomic, epigenetic, and mutational landscapes (Verhaak et al., *Cancer Cell* 2010).
+Glioblastoma Multiforme (GBM) is the most aggressive primary brain tumour in adults, with a median overall survival of ~15 months. It exhibits profound molecular heterogeneity across three well-characterised subtypes - **Proneural**, **Classical**, and **Mesenchymal** - each with distinct transcriptomic, epigenetic, and mutational landscapes (Verhaak et al., *Cancer Cell* 2010).
 
 This project integrates three molecular modalities from TCGA-GBM (simulated with published biological parameters) using **Multi-Omics Factor Analysis Plus (MOFA+)** to:
 
@@ -137,8 +137,4 @@ python run_pipeline.py
 - Argelaguet R et al. (2020). MOFA+: a statistical framework for comprehensive integration of multi-modal single-cell data. *Genome Biology*, 21, 111.
 - Davidson-Pilon C (2019). lifelines: survival analysis in Python. *Journal of Open Source Software*, 4(40), 1317.
 
----
 
-## Licence
-
-MIT — free to use, adapt, and share with attribution.

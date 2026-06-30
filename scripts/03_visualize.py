@@ -128,7 +128,7 @@ def fig_data_overview(expr, meth, muts, clin):
                   f"{expr.shape[1]} genes  (80 shown)")
     _draw_heatmap(fig.add_subplot(gs[1]),
                   meth, "DNA Methylation\n(β values)", "RdBu_r", 0.05, 0.95,
-                  f"{meth.shape[1]} CpG sites  (80 shown)")
+                  f"{meth.shape[1]} genes (HM450, gene-level)")
     _draw_heatmap(fig.add_subplot(gs[2]),
                   muts, "Somatic Mutations\n(binary)", "Greys", 0, 1,
                   f"{muts.shape[1]} driver genes  (all shown)")
@@ -139,7 +139,7 @@ def fig_data_overview(expr, meth, muts, clin):
     fig.legend(handles=patches, loc="upper center", ncol=3,
                bbox_to_anchor=(0.5, 1.03), frameon=False, fontsize=9)
 
-    fig.suptitle("TCGA-GBM Multi-Omics Data Overview  (N=150)", y=1.07,
+    fig.suptitle(f"TCGA-GBM Multi-Omics Data Overview  (N={expr.shape[0]})", y=1.07,
                  fontsize=13, fontweight="bold")
     fig.savefig(figpath("01_data_overview.png"))
     plt.close(fig)
@@ -185,11 +185,11 @@ def fig_variance_explained(r2: pd.DataFrame, r2t: pd.Series):
 
     # Annotation: factor labels
     factor_annot = {
-        "Factor1": "Proneural/Mes\naxis",
-        "Factor2": "Mutation\nsignature",
-        "Factor3": "G-CIMP /\nMGMT",
-        "Factor4": "Expression\nmodule",
-        "Factor5": "Minor\nsignal",
+        "Factor1": "Mutation\nlandscape",
+        "Factor2": "Transcriptional\nsubtype",
+        "Factor3": "Expression\nmodule A",
+        "Factor4": "Expression\nmodule B",
+        "Factor5": "Methylation\naxis",
     }
     for i, (fac, lab) in enumerate(factor_annot.items()):
         if fac in r2.index:
@@ -257,7 +257,7 @@ def fig_factor_umap(Z: pd.DataFrame, clin: pd.DataFrame):
     plt.colorbar(sc, ax=ax2, shrink=0.75, label="Factor 1 score")
     ax2.set_xlabel("UMAP 1", fontsize=10)
     ax2.set_ylabel("UMAP 2", fontsize=10)
-    ax2.set_title("MOFA+ Factor Space – Factor 1 (Proneural ↔ Mesenchymal)",
+    ax2.set_title("MOFA+ Factor Space – Factor 1 (Mutation landscape)",
                   fontsize=11, fontweight="bold")
     ax2.set_xticks([]); ax2.set_yticks([])
 
@@ -278,11 +278,11 @@ def fig_factor_distributions(Z: pd.DataFrame, clin: pd.DataFrame):
     fig, axes = plt.subplots(1, K, figsize=(3.5*K, 5), sharey=False)
 
     factor_titles = [
-        "Factor 1\nProneural ↔ Mes",
-        "Factor 2\nMutation signature",
-        "Factor 3\nG-CIMP / MGMT",
-        "Factor 4\nExpression module",
-        "Factor 5\nMinor signal",
+        "Factor 1\nMutation landscape",
+        "Factor 2\nTranscriptional\nsubtype",
+        "Factor 3\nExpression\nmodule A",
+        "Factor 4\nExpression\nmodule B",
+        "Factor 5\nMethylation\naxis",
     ]
 
     for i, (fac, ax) in enumerate(zip(Z.columns[:K], axes)):
@@ -339,14 +339,14 @@ def fig_top_weights(W_e, W_m, W_u):
         ("Factor1", W_e, "Expression",   VIEW_COL["Expression"],  16, 0, 0),
         ("Factor1", W_m, "Methylation",  VIEW_COL["Methylation"], 16, 0, 1),
         ("Factor1", W_u, "Mutations",    VIEW_COL["Mutations"],   15, 0, 2),
-        ("Factor3", W_e, "Expression",   VIEW_COL["Expression"],  16, 1, 0),
-        ("Factor3", W_m, "Methylation",  VIEW_COL["Methylation"], 16, 1, 1),
-        ("Factor3", W_u, "Mutations",    VIEW_COL["Mutations"],   15, 1, 2),
+        ("Factor2", W_e, "Expression",   VIEW_COL["Expression"],  16, 1, 0),
+        ("Factor2", W_m, "Methylation",  VIEW_COL["Methylation"], 16, 1, 1),
+        ("Factor2", W_u, "Mutations",    VIEW_COL["Mutations"],   15, 1, 2),
     ]
 
     factor_labels = {
-        "Factor1": "Factor 1  (Proneural ↔ Mesenchymal axis)",
-        "Factor3": "Factor 3  (G-CIMP / MGMT methylation)",
+        "Factor1": "Factor 1  (Mutation landscape)",
+        "Factor2": "Factor 2  (Transcriptional subtype axis)",
     }
 
     for (fac, W, view, col, top_n, row, c) in configs:
@@ -376,7 +376,7 @@ def fig_top_weights(W_e, W_m, W_u):
         ax.tick_params(axis="x", labelsize=8)
 
     # Row super-titles
-    for row_idx, fac in enumerate(["Factor1", "Factor3"]):
+    for row_idx, fac in enumerate(["Factor1", "Factor2"]):
         fig.text(0.5, 0.97 - row_idx * 0.50,
                  factor_labels[fac], ha="center", fontsize=11,
                  fontweight="bold", va="top",

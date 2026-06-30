@@ -210,11 +210,11 @@ def fig_cox_forest(df: pd.DataFrame) -> pd.DataFrame:
 
     # ── Forest plot ────────────────────────────────────────────────────────
     factor_labels = {
-        "Factor1": "Factor 1\n(Proneural/Mes axis)",
-        "Factor2": "Factor 2\n(Mutation signature)",
-        "Factor3": "Factor 3\n(G-CIMP/MGMT)",
-        "Factor4": "Factor 4\n(Expression module)",
-        "Factor5": "Factor 5\n(Minor signal)",
+        "Factor1": "Factor 1\n(Mutation landscape)",
+        "Factor2": "Factor 2\n(Transcriptional subtype)",
+        "Factor3": "Factor 3\n(Expression module A)",
+        "Factor4": "Factor 4\n(Expression module B)",
+        "Factor5": "Factor 5\n(Methylation axis)",
     }
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 6),

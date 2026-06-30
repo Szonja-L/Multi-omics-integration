@@ -26,8 +26,7 @@ This project integrates three real molecular modalities from TCGA-GBM using
 - Compare early fusion, late fusion, and MOFA+ integration strategies for survival prediction
 
 Data are drawn directly from the public **cBioPortal REST API** (no authentication required)
-via a programmatic acquisition pipeline, replacing the synthetic simulation used in the
-original version of this project.
+via a programmatic acquisition pipeline (`gbm-real-data/01_acquire_real_data.py`).
 
 ---
 
@@ -38,10 +37,6 @@ original version of this project.
 | TCGA GBM, Firehose Legacy | `gbm_tcga` | RNA-seq expression, HM450 methylation, somatic mutations, OS / age / Karnofsky |
 | TCGA GBM, Cell 2013 | `gbm_tcga_pub2013` | Molecular subtype labels (Verhaak/Wang classification) |
 
-Data are fetched programmatically via `gbm-real-data/01_acquire_real_data.py`, which resolves
-gene symbols to Entrez IDs, pulls per-gene molecular values, and writes the four input CSVs.
-No manual downloads are required.
-
 ### Molecular modalities
 
 | Modality | Profile | Features | Notes |
@@ -51,11 +46,9 @@ No manual downloads are required.
 | Somatic mutations | Somatic MAF | 22 genes* | Binary (0/1); Bernoulli likelihood in MOFA+ |
 
 \* 28 of the original 50-gene driver panel had zero mutations in this cohort and were dropped
-before training (see *Known Limitations* below).
+before training (see *Known Limitations*).
 
 ### Gene panel
-
-Genes were selected from four published GBM functional categories:
 
 | Category | Example genes |
 |----------|--------------|
@@ -68,12 +61,9 @@ Genes were selected from four published GBM functional categories:
 
 ## Cohort & Study Design
 
-### Sample selection
-
-- **Primary tumour samples only** (TCGA barcode suffix `-01`) to avoid double-counting patients
-  with multiple tumour samples.
-- **Complete-case strategy**: only patients with data in all three modalities were retained.
-- **Survival filter**: patients without `OS_MONTHS` or `OS_STATUS` were excluded.
+- **Primary tumour samples only** (TCGA barcode suffix `-01`)
+- **Complete-case strategy**: patients with data in all three modalities retained
+- **Survival filter**: patients without `OS_MONTHS` / `OS_STATUS` excluded
 
 | Filter step | N patients |
 |------------|-----------|
@@ -82,19 +72,9 @@ Genes were selected from four published GBM functional categories:
 | + Molecular subtype label | 44 |
 | + Overall survival data | **36** |
 
-### Subtype harmonisation
-
-Subtype labels from `gbm_tcga_pub2013` (EXPRESSION_SUBTYPE, sample-level) were merged with
-the molecular data using TCGA patient barcodes. Two literature-grounded adjustments were
-applied:
-
-- **"Neural" subtype dropped** (83 patients excluded from the broader cohort): Wang et al.
-  (2017, *Cancer Cell*) demonstrated that the original Neural subtype is largely driven by
-  contaminating normal brain tissue, and it has been removed from the revised consensus
-  classification.
-- **"G-CIMP" merged into Proneural** (39 patients reclassified): G-CIMP tumours are IDH-mutant
-  and transcriptionally Proneural (Noushmehr et al. 2010; Brennan et al. 2013). G-CIMP
-  represents a methylation-axis label that sits within the Proneural transcriptional group.
+**Subtype harmonisation** (two literature-grounded adjustments):
+- **"Neural" dropped** — Wang et al. (2017, *Cancer Cell*) showed this subtype is driven by contaminating normal brain tissue; removed from the revised consensus classification
+- **"G-CIMP" → Proneural** — G-CIMP tumours are IDH-mutant and transcriptionally Proneural (Noushmehr et al. 2010; Brennan et al. 2013)
 
 **Final cohort: N = 36** (CL = 11 · MES = 14 · PN = 11)
 
@@ -116,24 +96,27 @@ scripts/
   05_fusion_comparison.py     →  Compare early / late / MOFA+ fusion by C-index
 ```
 
-Run the full analysis pipeline (after acquiring data):
-```bash
-python scripts/02_mofa_integration.py
-python scripts/03_visualize.py
-python scripts/04_survival_analysis.py
-python scripts/05_fusion_comparison.py
-```
-
 ---
 
 ## Key Results
 
+### Input Data Overview
+
+<p align="center">
+  <img src="results/figures/01_data_overview.png" width="900" alt="Heatmaps of expression, methylation and mutation data sorted by GBM subtype">
+</p>
+
+Patients sorted by molecular subtype. Expression: log₂(RSEM+1); Methylation: HM450 gene-level beta values; Mutations: binary somatic calls.
+
+---
+
 ### MOFA+ Latent Factors
 
-MOFA+ converged to **9 active factors** from 10 initialised, using ARD and spike-and-slab
-sparsity priors. The Bernoulli likelihood was applied to the binary mutation view.
+MOFA+ converged to **9 active factors** from 10 initialised, using ARD and spike-and-slab sparsity priors. Bernoulli likelihood applied to the binary mutation view.
 
-**Marginal variance explained per factor:**
+<p align="center">
+  <img src="results/figures/02_variance_explained.png" width="820" alt="Variance explained per factor and per modality">
+</p>
 
 | Factor | Expression | Methylation | Mutations | Interpretation |
 |--------|-----------|------------|----------|----------------|
@@ -142,37 +125,47 @@ sparsity priors. The Bernoulli likelihood was applied to the binary mutation vie
 | Factor 3 | **12.9%** | 0.0% | 0.0% | Expression module A |
 | Factor 4 | **9.0%** | 1.8% | 0.0% | Expression module B |
 | Factor 5 | 1.3% | **8.8%** | 0.0% | Methylation axis |
-| Factor 6–9 | 4–7% | 1–5% | <0.1% | Minor expression / methylation signals |
+| Factor 6–9 | 4–7% | 1–5% | <0.1% | Minor signals |
 
-**Total R² across all factors:**
+**Total R²:** Expression 66.5% · Methylation 37.6% · Mutations 39.4%
 
-| Modality | Total R² |
-|----------|---------|
-| Expression | 66.5% |
-| Methylation | 37.6% |
-| Mutations | 39.4% |
+Factor 1 being primarily mutation-driven reflects real TCGA-GBM biology: with only 68 somatic
+mutation calls across 22 genes, the mutations that *do* exist co-vary strongly enough to anchor
+a dedicated factor (IDH1/TP53 co-occurrence in Proneural vs. EGFR enrichment in Classical).
 
-Factor 1 being primarily mutation-driven (39.2%) rather than expression-driven reflects the
-real TCGA-GBM biology: with N = 36 and only 68 total somatic mutation calls across 22 genes,
-the binary mutation view has limited variance to explain, but the mutations that do exist
-co-vary strongly enough to anchor a dedicated factor (likely IDH1/TP53 co-occurrence in
-Proneural vs. EGFR enrichment in Classical).
+<p align="center">
+  <img src="results/figures/09_modality_contribution.png" width="780" alt="Per-modality variance contribution per factor">
+</p>
 
-### Mutation sanity checks
+---
 
-| Gene | CL mutation rate | MES mutation rate | PN mutation rate |
-|------|-----------------|-------------------|-----------------|
-| EGFR | 36.4% | 28.6% | 0.0% |
-| TP53 | 9.1% | 35.7% | **54.5%** |
-| NF1 | 0.0% | **21.4%** | 9.1% |
-| IDH1 | 0.0% | 0.0% | **27.3%** |
+### Factor Space
 
-These rates are consistent with published TCGA-GBM driver landscapes (Brennan et al., *Cell*
-2013; Cancer Genome Atlas Research Network, *Nature* 2008).
+<p align="center">
+  <img src="results/figures/03_factor_umap.png" width="820" alt="UMAP of MOFA+ factor scores coloured by subtype and Factor 1">
+</p>
+
+<p align="center">
+  <img src="results/figures/04_factor_distributions.png" width="820" alt="Violin plots of MOFA+ factor scores by GBM molecular subtype">
+</p>
+
+---
+
+### Top Feature Weights
+
+<p align="center">
+  <img src="results/figures/05_top_weights.png" width="900" alt="Top-weighted genes for Factor 1 (mutation) and Factor 2 (expression)">
+</p>
+
+---
 
 ### Survival Analysis
 
-**Kaplan–Meier by molecular subtype:**
+**Kaplan–Meier by molecular subtype** · log-rank **p = 0.036**
+
+<p align="center">
+  <img src="results/figures/06_km_curves.png" width="900" alt="Kaplan-Meier survival curves by subtype and MOFA+ factor">
+</p>
 
 | Subtype | Median OS |
 |---------|----------|
@@ -180,13 +173,15 @@ These rates are consistent with published TCGA-GBM driver landscapes (Brennan et
 | Classical | 9.0 months |
 | Mesenchymal | **8.6 months** |
 
-Log-rank test (subtype): **p = 0.036** (statistically significant at α = 0.05)
-
-This matches the published GBM survival literature: Mesenchymal tumours carry the worst
-prognosis, while Proneural — particularly IDH-mutant / G-CIMP cases (reclassified here) —
-tend toward slightly longer survival.
+Mesenchymal tumours carry the worst prognosis, while Proneural — particularly the IDH-mutant /
+G-CIMP cases reclassified here — show longer survival. This matches the published GBM survival
+literature (Verhaak 2010; Wang 2017).
 
 **Cox Proportional Hazards (MOFA+ factors):**
+
+<p align="center">
+  <img src="results/figures/07_cox_forest.png" width="820" alt="Cox PH hazard ratio forest plot for MOFA+ factors">
+</p>
 
 | Factor | Model | HR | p-value |
 |--------|-------|----|---------|
@@ -194,12 +189,16 @@ tend toward slightly longer survival.
 | Factor 2 (transcriptional subtype) | Multivariate | 2.621 | 0.037 * |
 | Factor 3 (expression module A) | Multivariate | 2.236 | 0.045 * |
 
-Factor 2 — the transcriptional subtype axis — independently predicts overall survival
-in both univariate and multivariate Cox models (HR = 2.62 adjusted, p = 0.037),
-demonstrating that the MOFA+ latent factor captures clinically meaningful variation beyond
-what is captured by individual gene measurements.
+Factor 2 — the transcriptional subtype axis — independently predicts overall survival in both
+univariate and multivariate Cox models (HR = 2.62 adjusted, p = 0.037).
 
-### Fusion Strategy Comparison (Harrell's C-index, 5-fold CV)
+---
+
+### Fusion Strategy Comparison
+
+<p align="center">
+  <img src="results/figures/08_fusion_comparison.png" width="720" alt="C-index bar chart comparing fusion strategies">
+</p>
 
 | Method | C-index |
 |--------|---------|
@@ -210,54 +209,35 @@ what is captured by individual gene measurements.
 | Mutations only | 0.506 ± 0.151 |
 | **Early fusion** | **0.471 ± 0.162** |
 
-**Early fusion underperformed all single-view baselines** — a direct consequence of the
-curse of dimensionality. Concatenating three views produces a 343-feature matrix fitted to
-only 36 patients; PCA decomposition is poorly constrained at this ratio, so the Cox model
-fitted on early-fusion features has less predictive power than any individual view. This is
-a well-documented failure mode of naive feature concatenation at small N (Dong et al. 2021,
-*Briefings in Bioinformatics*) and is arguably the most instructive real-data finding in
-the project — the synthetic version, designed with clean subtype separation, masked this
-entirely.
-
-MOFA+ (C = 0.596) avoids early fusion's collapse by learning structured latent factors
-per view before combining information, but the wide CV confidence intervals (±0.208) reflect
-the genuine statistical uncertainty at N = 36.
+**Early fusion underperformed every single-view baseline** — a direct consequence of the curse
+of dimensionality. Concatenating three views produces a 343-feature matrix fitted to only 36
+patients; PCA decomposition is poorly constrained at this ratio. This is a well-documented
+failure mode of naive feature concatenation at small N (Dong et al. 2021, *Briefings in
+Bioinformatics*) and is arguably the most instructive real-data finding in this project —
+the synthetic version masked it entirely. MOFA+ avoids this collapse by learning structured
+latent factors per view before combining information.
 
 ---
 
-## Figures
+### Mutation Sanity Checks
 
-| Figure | Description |
-|--------|-------------|
-| `01_data_overview.png` | Heatmaps of all three modalities, patients sorted by subtype |
-| `02_variance_explained.png` | Marginal R² per factor and per modality; total R² per view |
-| `03_factor_umap.png` | UMAP of MOFA+ factor scores coloured by subtype and Factor 1 score |
-| `04_factor_distributions.png` | Violin plots of factor scores stratified by molecular subtype |
-| `05_top_weights.png` | Top-weighted genes for Factor 1 (mutation) and Factor 2 (expression) |
-| `06_km_curves.png` | Kaplan–Meier curves (subtype + MOFA+ factor high/low splits) |
-| `07_cox_forest.png` | Univariate and multivariate Cox PH hazard ratio forest plot |
-| `08_fusion_comparison.png` | C-index bar chart across all fusion strategies |
-| `09_modality_contribution.png` | Grouped bars: per-modality R² contribution per factor |
+| Gene | CL | MES | PN |
+|------|-----|-----|-----|
+| EGFR | 36.4% | 28.6% | 0.0% |
+| TP53 | 9.1% | 35.7% | **54.5%** |
+| NF1 | 0.0% | **21.4%** | 9.1% |
+| IDH1 | 0.0% | 0.0% | **27.3%** |
+
+Rates consistent with published TCGA-GBM driver landscapes (Brennan et al., *Cell* 2013).
 
 ---
 
 ## Known Limitations
 
-- **Small complete-case cohort (N = 36):** TCGA-GBM's multi-platform coverage is sparse —
-  only 45 patients had primary-tumour samples in all three modalities, and 9 lacked
-  survival or subtype data. All C-index estimates carry wide confidence intervals.
-- **Gene-level methylation:** cBioPortal's molecular-data API returns one beta value per
-  gene (averaged across HM450 probes mapping to that gene), not raw CpG-probe-level data.
-  Fine-scale promoter methylation patterns (e.g. individual MGMT CpG islands) are not
-  captured.
-- **TERT promoter mutations not captured:** Standard TCGA exome MAF calling uses
-  coding-region intervals and typically misses TERT promoter mutations (c.-124C>T /
-  c.-146C>T). The near-zero TERT mutation rate here is a known TCGA data limitation, not
-  a biology signal.
-- **Mutation sparsity:** With 68 total somatic calls across 22 genes and 36 patients,
-  the binary mutation view is extremely sparse. This is reflected in low mutation
-  variance explained across most factors and the near-random C-index for the
-  mutation-only baseline (C = 0.506).
+- **Small complete-case cohort (N = 36):** TCGA-GBM's multi-platform coverage is sparse; all C-index estimates carry wide confidence intervals
+- **Gene-level methylation:** cBioPortal returns one beta value per gene (averaged across HM450 probes), not raw CpG-probe-level data
+- **TERT promoter mutations not captured:** Standard TCGA exome MAF calling misses TERT promoter mutations — the near-zero TERT rate is a known data limitation
+- **Mutation sparsity:** 68 total somatic calls across 22 genes and 36 patients; near-random mutation-only C-index (0.506) is expected
 
 ---
 
@@ -268,36 +248,25 @@ git clone https://github.com/Szonja-L/Multi-Omics-Integration.git
 cd Multi-Omics-Integration
 pip install -r requirements.txt
 
-# Step 1: acquire real data from cBioPortal (requires internet)
+# Acquire real data from cBioPortal (requires internet, ~2 min)
 python gbm-real-data/01_acquire_real_data.py
 
-# Step 2: run analysis pipeline
+# Run analysis pipeline (~5 min on a standard laptop)
 python scripts/02_mofa_integration.py
 python scripts/03_visualize.py
 python scripts/04_survival_analysis.py
 python scripts/05_fusion_comparison.py
 ```
 
-**Python 3.10+ required.** Data acquisition takes ~2 minutes (API calls);
-full analysis pipeline runs in < 5 minutes on a standard laptop.
-
 ---
 
 ## References
 
-- Verhaak RGW et al. (2010). Integrated genomic analysis identifies clinically relevant
-  subtypes of glioblastoma. *Cancer Cell*, 17(1), 98–110.
-- Wang Q et al. (2017). Tumor evolution of glioma-intrinsic gene expression subtypes
-  associates with immunological changes in the microenvironment. *Cancer Cell*, 32(1), 42–56.
-- Noushmehr H et al. (2010). Identification of a CpG island methylator phenotype that
-  defines a distinct subgroup of glioma. *Cancer Cell*, 17(5), 510–522.
-- Brennan CW et al. (2013). The somatic genomic landscape of glioblastoma. *Cell*,
-  155(2), 462–477.
-- Cancer Genome Atlas Research Network (2008). Comprehensive genomic characterization
-  defines human glioblastoma genes and core pathways. *Nature*, 455, 1061–1068.
-- Argelaguet R et al. (2020). MOFA+: a statistical framework for comprehensive integration
-  of multi-modal single-cell data. *Genome Biology*, 21, 111.
-- Davidson-Pilon C (2019). lifelines: survival analysis in Python.
-  *Journal of Open Source Software*, 4(40), 1317.
-- Dong Z et al. (2021). Challenges and opportunities for multi-omics data integration in
-  cancer research. *Briefings in Bioinformatics*, 22(5), bbab120.
+- Verhaak RGW et al. (2010). Integrated genomic analysis identifies clinically relevant subtypes of glioblastoma. *Cancer Cell*, 17(1), 98–110.
+- Wang Q et al. (2017). Tumor evolution of glioma-intrinsic gene expression subtypes associates with immunological changes in the microenvironment. *Cancer Cell*, 32(1), 42–56.
+- Noushmehr H et al. (2010). Identification of a CpG island methylator phenotype that defines a distinct subgroup of glioma. *Cancer Cell*, 17(5), 510–522.
+- Brennan CW et al. (2013). The somatic genomic landscape of glioblastoma. *Cell*, 155(2), 462–477.
+- Cancer Genome Atlas Research Network (2008). Comprehensive genomic characterization defines human glioblastoma genes and core pathways. *Nature*, 455, 1061–1068.
+- Argelaguet R et al. (2020). MOFA+: a statistical framework for comprehensive integration of multi-modal single-cell data. *Genome Biology*, 21, 111.
+- Davidson-Pilon C (2019). lifelines: survival analysis in Python. *Journal of Open Source Software*, 4(40), 1317.
+- Dong Z et al. (2021). Challenges and opportunities for multi-omics data integration in cancer research. *Briefings in Bioinformatics*, 22(5), bbab120.
